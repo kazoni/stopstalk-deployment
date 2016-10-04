@@ -20,32 +20,14 @@
     THE SOFTWARE.
 """
 
-atable = db.auth_user
-emails = db(atable.registration_key != "").select(atable.email)
-unverified_emails = set([x.email for x in emails])
+import re
 
-rows = db(db.queue.status == "pending").select()
+stable = db.submission
+query = (stable.site == "CodeChef") & \
+        (stable.status == "AC")
+submissions = db(query).select()
 
-count = 0
-for row in rows:
-    if count == 40:
-        break
-    if row.email in unverified_emails:
-        continue
-    count += 1
-    if bulkmail.send(to=row.email,
-                     subject=row.subject,
-                     message=row.message):
-        row.update_record(status="sent")
-        print "Email sent to %s" % row.email
-    else:
-        print "ERROR: " + str(bulkmail.error)
-        if str(bulkmail.error).__contains__("Mail rate exceeded limit") is False:
-            # Email sending failed with some other reason
-            row.update_record(status="failed")
-            print "Email sending to %s failed with: %s" % (row.email,
-                                                           bulkmail.error)
-        else:
-            # Email sending failed due to Mail rate
-            break
-    db.commit()
+for submission in submissions:
+    points = float(re.sub("\[.*?\]", "", submission.points))
+    if points < 100:
+        submission.update_record(status="PS")
